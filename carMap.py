@@ -17,6 +17,18 @@ def degreeConvert(degrees, direction):
 	else:
 		return str(-decimal)
 
+def telRequest(ip):
+	try:
+		telnet = telnetlib.Telnet(ip,23,3)
+		print 'connected'
+		telnet.read_until('Basics[', 5)
+		telnet.write("gpspos\n")
+		GPGGA = telnet.read_until('Basics[',5)
+		telnet.close()
+		return GPGGA
+	except Exception as e:
+		raise e
+	
 def main():
 	while True:
 		try:
@@ -29,12 +41,7 @@ def main():
 				print "%s" % ip
 
 				try:
-					telnet = telnetlib.Telnet(ip,23,3)
-					print 'connected'
-					telnet.read_until('Basics[', 5)
-					telnet.write("gpspos\n")
-					GPGGA = telnet.read_until('Basics[',5)
-					telnet.close()
+					GPGGA = telRequest(ip)
 					#print GPGGA
 					GPGGA = GPGGA.split("$GPGGA")[1].split(',')
 					lat = degreeConvert(GPGGA[2], GPGGA[3])
