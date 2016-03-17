@@ -56,6 +56,7 @@ def main():
 			f = file(str(time.time()).split('.')[0]+'.kml', 'w')
 			f.write(etree.tostring(fld, pretty_print=True))
 			f.close()
+			print "file generated"
 
 		except shodan.APIError as e:
 			print e
