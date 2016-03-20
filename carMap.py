@@ -1,10 +1,11 @@
 import telnetlib
-import shodan
+import shodan 
 import json
 from lxml import etree
 from pykml.factory import KML_ElementMaker as KML
 import time
 import argparse
+from bs4 import BeautifulSoup
 
 SHODAN_API_KEY = "HYhda2LaXJNae5kK5ciNqebYQ9pT4ssE"
 fld = KML.Folder()
@@ -22,10 +23,10 @@ def degreeConvert(degrees, direction):
 
 def telRequest(ip):
 	try:
-		telnet = telnetlib.Telnet(ip,23,5)
+		telnet = telnetlib.Telnet(ip,23,3)
 		print('Connected')
 		telnet.read_until('Basics[', 5)
-		telnet.write("list can\n")
+		telnet.write("gpspos\n")
 		GPGGASentence = telnet.read_until('Basics[',5)
 		telnet.close()
 		return GPGGASentence
@@ -37,9 +38,12 @@ class htmlBulider(object):
 	"""docstring for htmlBulider"""
 	def __init__(self):
 		super(htmlBulider, self).__init__()
-		self.html=""
-	def addToHtml(self):
-		pass
+		self.html=BeautifulSoup(file('index.html','r'), 'html.parser')
+	def addToHtml(self, ip, lonLat):
+		self.html.script.string = self.html.script.string[:116]+ u"var " + 'a' + str(time.time()).split('.')[0] + u" = new google.maps.Marker({position:{lat: " + lonLat[1] + u", lng: " + lonLat[0] + u"},map:map,title: '" + ip + u"'});" + self.html.script.string[116:]
+		print(self.html.script)
+	def getHTMLString(self):
+		return self.html.prettify()
 
 
 class kmlBulider(object):
@@ -51,7 +55,7 @@ class kmlBulider(object):
 		pm = KML.Placemark(
 		KML.name(ip),
 			KML.Point(
-				KML.coordinates(lonLat)
+				KML.coordinates(lonLat[0]+','+lonLat[1])
 				)
 			)
 		#print(etree.tostring(pm, pretty_print=True))
@@ -61,6 +65,7 @@ class kmlBulider(object):
 	
 def main():
 	if args.H:
+		HTMLBldr = htmlBulider()
 		fileExtention='.html'
 
 	if args.K:
@@ -81,18 +86,21 @@ def main():
 					GPGGASentence = GPGGASentence.split("$GPGGA")[1].split(',')
 					lat = degreeConvert(GPGGASentence[2], GPGGASentence[3])
 					lon = degreeConvert(GPGGASentence[4], GPGGASentence[5])
-					lonLat = lon +','+ lat
+					lonLat = (lon,lat)
 					if args.K:
 						KMLBldr.addToKML(ip, lonLat)
 					if args.H:
-						addToHtml(ip,lonLat)
+						HTMLBldr.addToHtml(ip, lonLat)
 					print("data aquired")
 
 				except Exception as e:
 					print e
 					continue
 			try:
-				f = file(str(time.time()).split('.')[0]+fileExtention, 'w')
+				if args.f == None:
+					f = file(str(time.time()).split('.')[0]+fileExtention, 'w')
+				else:
+					f = file(args.f, 'w')
 				if args.K:
 					f.write(KMLBldr.getKMLString())
 				if args.H:
@@ -109,6 +117,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description="Finds TGUs and maps them.")
 	parser.add_argument('-K', action='store_true', default=False, help="Specifies the output as KML, this or HTML output is required for program excution.")
 	parser.add_argument('-H', action='store_true', default=False, help="Specifies the output as HTML, this or KML output is required for program excution.")
+	parser.add_argument('-f', type=str, default=None, help='Specifies the filename that should be used. If none is specified the current unix timestamp is used instead')
 	args = parser.parse_args()
 	if args.K==False and args.H==False:
 		print("Please specify a either HTML or KML")
