@@ -7,7 +7,7 @@ import time
 import argparse
 from bs4 import BeautifulSoup
 
-SHODAN_API_KEY = "HYhda2LaXJNae5kK5ciNqebYQ9pT4ssE"
+SHODAN_API_KEY = ""
 fld = KML.Folder()
 
 
