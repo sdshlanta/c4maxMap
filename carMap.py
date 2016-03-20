@@ -40,8 +40,11 @@ class htmlBulider(object):
 		super(htmlBulider, self).__init__()
 		self.html=BeautifulSoup(file('index.html','r'), 'html.parser')
 	def addToHtml(self, ip, lonLat):
-		self.html.script.string = self.html.script.string[:116]+ u"var " + 'a' + str(time.time()).split('.')[0] + u" = new google.maps.Marker({position:{lat: " + lonLat[1] + u", lng: " + lonLat[0] + u"},map:map,title: '" + ip + u"'});" + self.html.script.string[116:]
-		print(self.html.script)
+		scripStart = self.html.script.string[:116]
+		scriptEnd = self.html.script.string[116:]
+		self.html.script.string = scripStart + u"var " + 'a' + str(time.time()).split('.')[0] + u" = new google.maps.Marker({position:{lat: " + lonLat[1] + u", lng: " + lonLat[0] + u"},map:map,title: '" + ip + u"'});" + scriptEnd
+		if args.d:
+			print(self.html.script)
 	def getHTMLString(self):
 		return self.html.prettify()
 
@@ -50,7 +53,6 @@ class kmlBulider(object):
 	"""docstring for kmlBulider"""
 	def __init__(self):
 		super(kmlBulider, self).__init__()
-		self.KMLFld = KML.Folder()
 	def addToKML(self, ip, lonLat):
 		pm = KML.Placemark(
 		KML.name(ip),
@@ -58,10 +60,11 @@ class kmlBulider(object):
 				KML.coordinates(lonLat[0]+','+lonLat[1])
 				)
 			)
-		#print(etree.tostring(pm, pretty_print=True))
+		if args.d:
+			print(etree.tostring(pm, pretty_print=True))
 		fld.append(pm)
 	def getKMLString(self):
-		return etree.tostring(self.KMLFld)
+		return etree.tostring(fld)
 	
 def main():
 	if args.H:
@@ -82,7 +85,8 @@ def main():
 
 				try:
 					GPGGASentence = telRequest(ip)
-					print(GPGGASentence)
+					if args.d:
+						print(GPGGASentence)
 					GPGGASentence = GPGGASentence.split("$GPGGA")[1].split(',')
 					lat = degreeConvert(GPGGASentence[2], GPGGASentence[3])
 					lon = degreeConvert(GPGGASentence[4], GPGGASentence[5])
@@ -92,7 +96,6 @@ def main():
 					if args.H:
 						HTMLBldr.addToHtml(ip, lonLat)
 					print("data aquired")
-
 				except Exception as e:
 					print e
 					continue
@@ -115,12 +118,9 @@ def main():
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description="Finds TGUs and maps them.")
-	parser.add_argument('-K', action='store_true', default=False, help="Specifies the output as KML, this or HTML output is required for program excution.")
-	parser.add_argument('-H', action='store_true', default=False, help="Specifies the output as HTML, this or KML output is required for program excution.")
+	parser.add_argument('-K', action='store_true', default=False, help="Specifies the output as KML, the default is HTML")
+	parser.add_argument('-H', action='store_true', default=True, help="Specifies the output as HTML, this is the default option.")
 	parser.add_argument('-f', type=str, default=None, help='Specifies the filename that should be used. If none is specified the current unix timestamp is used instead')
+	parser.add_argument('-d', action='store_true', default=False, help='activates debug mode which increses the verbosity of the printed messages')
 	args = parser.parse_args()
-	if args.K==False and args.H==False:
-		print("Please specify a either HTML or KML")
-		exit()
-
 	main()
