@@ -6,10 +6,13 @@ from pykml.factory import KML_ElementMaker as KML
 import time
 import argparse
 from bs4 import BeautifulSoup
+import requests
+import threading
+import queue
 
-SHODAN_API_KEY = ""
 fld = KML.Folder()
 
+IPqueue = queue.Queue(maxsize=0)
 
 def degreeConvert(degrees, direction):
 	deg_min, dmin = degrees.split('.')
@@ -33,7 +36,6 @@ def telRequest(ip):
 	except Exception as e:
 		raise e
 
-
 class htmlBulider(object):
 	"""docstring for htmlBulider"""
 	def __init__(self):
@@ -47,7 +49,6 @@ class htmlBulider(object):
 			print(self.html.script)
 	def getHTMLString(self):
 		return self.html.prettify()
-
 
 class kmlBulider(object):
 	"""docstring for kmlBulider"""
@@ -66,6 +67,59 @@ class kmlBulider(object):
 	def getKMLString(self):
 		return etree.tostring(fld)
 	
+class censys(object):
+	"""docstring for censys"""
+	def __init__(self, censysApiKey):
+		super(censys, self).__init__()
+		self.censysApiKey = censysApiKey
+		self.API_URL = "https://www.censys.io/api/v1"
+	def search(self, searchQuery):
+		if self.censysApiKey == None:
+				return set()
+		
+		pages = float('inf')
+		page = 1
+		while page <= pages:
+			try:
+				print('Page: ' + str(page))
+				params = {'query' : searchQuery, 'page' : page}
+				res = requests.post(self.API_URL + "/search/ipv4", json = params, auth = (self.censysApiKey[0], self.censysApiKey[1]))
+				payload = res.json()
+				ips = set()
+				for result in payload['results']:
+					ips.add(result['ip'])
+				pages = payload['metadata']['pages']
+				page+=1
+				time.sleep(1)
+			except KeyboardInterrupt as e:
+				break
+			except Exception as e:
+				if args.d:
+					print(e)
+					print(json.dumps(payload))
+				continue
+			
+		return ips
+
+class APIRequests(object):
+	"""docstring for APIRequests"""
+	def __init__(self, shodanApiKey, censysApiKey):
+		super(APIRequests, self).__init__()
+		self.god = None
+		self.Censys = None
+		try:
+			self.god = shodan.Shodan(shodanApiKey)
+		except shodan.APIError as e:
+			print(e)
+		self.Censys = censys(censysApiKey)
+	def search(self, searchQuery):
+		shodanResults = self.god.search(searchQuery)
+		ips = set()
+		for result in shodanResults['matches']:
+			ips.add(result['ip_str'])
+		for ip in ips|self.Censys.search(searchQuery):
+			IPqueue.put(ip,True)
+
 def main():
 	if args.H:
 		HTMLBldr = htmlBulider()
@@ -74,16 +128,15 @@ def main():
 	if args.K:
 		fileExtention='.kml'
 		KMLBldr = kmlBulider()
+
+	APIRequests(args.s,args.c).search('port:23 gps "on console"')
+
 	while True:
 		try:
-			god = shodan.Shodan(SHODAN_API_KEY)
-
-			queryResults = god.search('port:23 gps "on console"')
-			for result in queryResults['matches']:
-				ip = result['ip_str']
-				print("%s" % ip)
-
+			while not IPqueue.empty():
 				try:
+					ip = IPqueue.get(True, 3)
+					print("%s" % ip)
 					GPGGASentence = telRequest(ip)
 					if args.d:
 						print(GPGGASentence)
@@ -96,8 +149,10 @@ def main():
 					if args.H:
 						HTMLBldr.addToHtml(ip, lonLat)
 					print("data aquired")
+				except KeyboardInterrupt:
+					raise
 				except Exception as e:
-					print e
+					print(e)
 					continue
 			try:
 				if args.f == None:
@@ -122,5 +177,10 @@ if __name__ == '__main__':
 	parser.add_argument('-H', action='store_true', default=True, help="Specifies the output as HTML, this is the default option.")
 	parser.add_argument('-f', type=str, default=None, help='Specifies the filename that should be used. If none is specified the current unix timestamp is used instead')
 	parser.add_argument('-d', action='store_true', default=False, help='activates debug mode which increses the verbosity of the printed messages')
+	parser.add_argument('-s', type=str, default=None, help='Specifies the use of the Shodan API, please supply your API key as an argument')
+	parser.add_argument('-c', type=str, default=None, nargs=2, help='Specifies the use of the Censys API, please supply your API key as an argument. Due to the paged nature of the API this will take some time...')
 	args = parser.parse_args()
+	if args.s == None and args.c == None:
+		print('Please specify the use of either the Shodan or Censys API.')
+		exit()
 	main()
