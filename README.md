@@ -3,4 +3,4 @@ After reading [this](http://jcarlosnorte.com/security/2016/03/06/hacking-tachogr
 
 When asking Censys for results you can press `ctrl+c` to intrupt the processes and proceed with the data you have so far.
 
-To run this script you need both a [Shodan API key](https://developer.shodan.io/) and a [Google Maps Javascript API key](https://developers.google.com/maps/documentation/javascript/get-api-key).
+To run this script you need both a [Shodan API key](https://developer.shodan.io/) and a [Google Maps Javascript API key](https://developers.google.com/maps/documentation/javascript/get-api-key)(to be put in the HTML file).
